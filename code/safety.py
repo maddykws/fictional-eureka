@@ -248,8 +248,14 @@ def check(issue: str, subject: str, company: str) -> SafetyDecision | None:
             )
 
     # 5. Fraud / identity theft
+    # Exception: FAQ questions asking WHERE/HOW to report lost/stolen cards
+    # are corpus-answerable ("where can I report...") — let them through.
+    _HOW_TO_REPORT = re.compile(
+        r"(where|how).{0,30}(report|report a|notify|block|cancel).{0,30}(lost|stolen|missing).{0,20}(card|visa)",
+        re.IGNORECASE
+    )
     for pat in _FRAUD_IDENTITY:
-        if pat.search(text):
+        if pat.search(text) and not _HOW_TO_REPORT.search(text):
             domain_area = "general_support" if co == "visa" else "security"
             return SafetyDecision(
                 triggered=True,
