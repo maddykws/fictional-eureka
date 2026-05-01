@@ -1,6 +1,8 @@
-anthropic>=0.40.0
 rank-bm25>=0.2.2
 python-dotenv>=1.0.0
+
+# UI
+gradio>=4.0.0
 
 # Evaluation (optional — needed for eval.py)
 deepeval>=1.4.0
