@@ -12,14 +12,13 @@ from __future__ import annotations
 import os
 import json
 import re
-import anthropic
+import subprocess
+import tempfile
 from dataclasses import dataclass
 
 from safety import check as safety_check, SafetyDecision
 from retriever import retrieve_for_ticket, format_context, get_retriever, LOW_SCORE_THRESHOLD
 from corpus import get_domain_for_company
-
-MODEL = "claude-sonnet-4-6"
 
 VALID_STATUSES       = {"replied", "escalated"}
 VALID_REQUEST_TYPES  = {"product_issue", "feature_request", "bug", "invalid"}
@@ -133,20 +132,25 @@ class TriageResult:
 
 
 def _call_claude(ticket_text: str, corpus_context: str) -> dict:
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    """
+    Call Claude via the `claude` CLI — uses Claude Code's existing OAuth session,
+    no separate ANTHROPIC_API_KEY required.
+    """
     user_message = (
         f"CORPUS DOCUMENTS:\n{corpus_context}\n\n"
         f"SUPPORT TICKET:\n{ticket_text}\n\n"
         "Produce the JSON triage output."
     )
-    resp = client.messages.create(
-        model=MODEL,
-        max_tokens=700,
-        temperature=0,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
+
+    result = subprocess.run(
+        ["claude", "-p", "--system-prompt", SYSTEM_PROMPT, user_message],
+        capture_output=True, text=True, timeout=60,
+        cwd="/tmp",  # neutral dir — avoids inheriting project session context
     )
-    raw = resp.content[0].text.strip()
+    raw = result.stdout.strip()
+
+    if not raw:
+        raise ValueError(f"Claude CLI returned empty output. stderr: {result.stderr[:200]}")
 
     # Strip markdown fences if model added them
     if raw.startswith("```"):
@@ -204,9 +208,12 @@ def triage(issue: str, subject: str, company: str) -> TriageResult:
     corpus_context = format_context(results)
 
     # ── 2b. Confidence gate (RAG survey 2023 / CRAG pattern) ─────────────────
-    # If max BM25 score is below threshold the corpus has no relevant document.
-    # Escalate rather than risk hallucinating a policy that doesn't exist.
-    if results:
+    # If max BM25 score is below threshold AND company is a known domain,
+    # escalate rather than risk hallucinating a policy that doesn't exist.
+    # Exception: company=None tickets may be out-of-scope/invalid — let Claude
+    # classify them as invalid rather than blindly escalating.
+    _known_company = company.strip().lower() in ("hackerrank", "claude", "visa")
+    if results and _known_company:
         max_score = max(r.score for r in results)
         if max_score < LOW_SCORE_THRESHOLD:
             return TriageResult(

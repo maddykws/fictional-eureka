@@ -66,9 +66,7 @@ def _write_output(results: list[dict], path: Path) -> None:
 
 
 def run(input_path: Path, output_path: Path, verbose: bool = True) -> None:
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        print("[ERROR] ANTHROPIC_API_KEY not set. Copy .env.example to .env and add your key.")
-        sys.exit(1)
+    # Agent uses claude CLI (Claude Code OAuth) — no separate API key required.
 
     print(f"\nSupport Triage Agent")
     print(f"  Input : {input_path}")
