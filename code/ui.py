@@ -106,14 +106,15 @@ def run_batch(csv_text: str) -> str:
             rtype  = ""
             resp   = str(e)[:60]
 
-        rows.append(f"| {i} | {issue[:40].replace('|','\\|')} | {company} | {status} | {rtype} | {resp} |")
+        issue_safe = issue[:40].replace("|", "\\|")
+        rows.append(f"| {i} | {issue_safe} | {company} | {status} | {rtype} | {resp} |")
 
     return "\n".join(rows)
 
 
 # ── UI layout ─────────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="Support Triage Agent", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Support Triage Agent") as demo:
 
     gr.Markdown("""
     # 🎫 Multi-Domain Support Triage Agent
@@ -235,4 +236,4 @@ with gr.Blocks(title="Support Triage Agent", theme=gr.themes.Soft()) as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.launch(server_name="0.0.0.0", server_port=7860, share=True, theme=gr.themes.Soft())
